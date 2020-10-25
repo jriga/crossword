@@ -20,7 +20,9 @@
   - source, text file with a wourd per line
   - max-length, maximum word length
   - min-length, minimum word length
-  - exclude-pattern, regex that exclude certain words"
+  - exclude-pattern, regex that exclude certain words
+
+  TODO: look into transducers for this function instead of the threading macro"
   ([source] (words source
                    (:max-length *options*)
                    (:min-length *options*)
@@ -31,15 +33,25 @@
           (remove #(or (re-find exclude-pattern %)
                        (< max-length (count %))
                        (> min-length (count %))))
+          (map #(.toLowerCase %))
           (shuffle)
-          (into '())))))
+          (into '() )))))
 
 (defn create-board
   "Creates a crossword board
   args:
   - n, int for the size of the square board"
   ([] (create-board (:max-length *options*)))
-  ([n] (atom (mapv #(into [] %) (partition n (repeat (* n n) empty-char))))))
+  ([n] (atom
+        {:words []
+         :grid (mapv #(into [] %) (partition n (repeat (* n n) empty-char)))})))
+
+(defrecord Word [direction coord pattern])
+
+(defn- filled?
+  "Predicate than tells if a board is filled"
+  [board]
+  )
 
 (defn fill-board
   "Fills in given board with the words provided"
@@ -54,8 +66,11 @@
 
 (defn- add-word [board [dir [x y]] word]
   (let [coord #(if (= 0 dir) [y (+ x %)] [(+ y %) x])]
-    (doseq [[i c] (map-indexed vector word)]
-      (swap! board update-in (coord i) (constantly c)))))
+    (swap! board (fn [b]
+                   {:words (conj (b :words) (Word. dir [x y] word))
+                    :grid (reduce #(update-in %1 (coord (first %2)) (constantly (last %2)))
+                                  (b :grid)
+                                  (map-indexed vector word))}))))
 
 (defn- seq-to-re-str
   "Return a regex str from a seq s"
@@ -70,8 +85,8 @@
   ([board [dir [x y]] min-length]
    (let [extract (partial take-while #(re-matches (re-pattern (str empty-char "|" \w)) (str %)))]
      (if (= 0 dir)
-       {:dir dir :coord [x y] :pattern (seq-to-re-str (extract (drop x (get @board y))))}
-       {:dir dir :coord [x y] :pattern (seq-to-re-str (extract (drop y (map #(get % x) @board))))}))))
+       {:dir dir :coord [x y] :pattern (seq-to-re-str (extract (drop x (get (@board :grid) y))))}
+       {:dir dir :coord [x y] :pattern (seq-to-re-str (extract (drop y (map #(get % x) (@board :grid)))))}))))
 
 (defn- random-start
   "Returns a tuple that represents:
@@ -79,7 +94,8 @@
   - position, on the board"
   [board]
   (let [direction (rand-int 2)
-        n (rand-int (count @board))]
+        n (rand-int (count (@board :grid)))]
     (if (= 0 direction)
       [direction [0 n]]
       [direction [n 0]])))
+
