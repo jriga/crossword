@@ -1,9 +1,10 @@
 (ns crossword.core
-  (:require [clojure.set :as s]
-            #?(:clj  [crossword.clj.source :as source]
-               :cljs [crossword.cljs.source :as source])))
-
-(declare fill-board add-noise random-start)
+  #?(:clj
+     (:require [clojure.set :as s]
+               [crossword.clj.source :as source]))
+  #?(:cljs
+      (:require [clojure.set :as s]
+                [crossword.cljs.source :as source])))
 
 (defonce default-options
   {:max-length 7
@@ -23,7 +24,8 @@
    {:words []
     :grid (mapv #(into [] %) (partition n (repeat (* n n) empty-char)))}))
 
-(defn generate
+(declare fill-board add-noise random-start)
+(defn ^:export generate
   ([]  (generate 100))
   ([n] (generate n {}))
   ([n user-options]
@@ -119,14 +121,6 @@
     (add-word board position word)
     board))
 
-(defn- fill-board
-  "Fills in given board with the words provided"
-  ([board word-seq] (fill-board board word-seq (random-start board)))
-  ([board word-seq position]
-   (let [sorted-word (sort-by count > word-seq)
-         init-board (add-word board position (first sorted-word))]
-     (reduce place-word init-board word-seq))))
-
 (defn- random-start
   "Returns a tuple that represents:
   - direction, 0 for horizontal and 1 for vertical
@@ -137,6 +131,14 @@
     (if (= 0 direction)
       [direction [0 n]]
       [direction [n 0]])))
+
+(defn- fill-board
+  "Fills in given board with the words provided"
+  ([board word-seq] (fill-board board word-seq (random-start board)))
+  ([board word-seq position]
+   (let [sorted-word (sort-by count > word-seq)
+         init-board (add-word board position (first sorted-word))]
+     (reduce place-word init-board word-seq))))
 
 (defn- add-noise [board]
   "Returns a board with empty-char replaced by random alphabet char"
