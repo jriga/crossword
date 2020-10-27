@@ -1,6 +1,7 @@
 (ns crossword.core
-  (:require [clojure.java.io :as io]
-            [clojure.set :as s]))
+  (:require [clojure.set :as s]
+            #?(:clj  [crossword.clj.source :as source]
+               :cljs [crossword.cljs.source :as source])))
 
 (declare fill-board add-noise random-start)
 
@@ -12,28 +13,6 @@
 (defonce empty-char \.)
 
 (defrecord Word [direction coord pattern])
-
-(defn words
-  "Creates subset of words that match required criterias
-  from the word.txt base file
-  (words source 7 3 #\".- \")
-  args:
-  - source, text file with a wourd per line
-  - max-length, maximum word length
-  - min-length, minimum word length
-  - exclude-pattern, regex that exclude certain words
-
-  TODO: look into transducers for this function instead of the threading macro"
-  ([source] (words source default-options))
-  ([source {:keys [max-length min-length exclude-pattern]}]
-   (with-open [rdr (io/reader (io/resource source))]
-     (->> (line-seq rdr)
-          (remove #(or (re-find exclude-pattern %)
-                       (< max-length (count %))
-                       (> min-length (count %))))
-          (map #(.toLowerCase %))
-          (shuffle)
-          (into '() )))))
 
 (defn create-board
   "Creates a crossword board
@@ -52,7 +31,7 @@
          board (create-board (:max-length options))]
      (-> board
          (fill-board
-                 (take n (words "words.txt" options))
+                 (take n (source/words "words.txt" options))
                  (:start options (random-start board)))
          add-noise))))
 
