@@ -4,7 +4,6 @@
 
 (def testfile "small.txt")
 
-
 (deftest test-default-options
   (testing "max length"
     (is (= 7 (:max-length c/default-options))))
@@ -13,22 +12,25 @@
   (testing "exclude pattern"
     (is (= (.pattern #"\s|\d|\W") (.pattern (:exclude-pattern c/default-options))))))
 
+(deftest test-record-word
+  (testing "attributes"
+    (is (= [:direction :coord :pattern] (keys (c/->Word 1 [0 0] "foo"))))))
+
 (deftest test-words
   (testing "returns random sample of words from file"
     (letfn [(testfn [] (take 10 testfile))]
-      (repeatedly 5
-                  #(is (not= (testfn) (testfn)))))))
+      (repeatedly 5 #(is (not= (testfn) (testfn)))))))
 
 (deftest test-create-board
-  (is (= [[\. \.] [\. \.]] (@(create-board 2) :grid)))
-  (is (= [[\. \. \.] [\. \. \.] [\. \. \.]] (@(create-board 3) :grid)))
+  (is (= [[\. \.] [\. \.]] (:grid (create-board 2))))
+  (is (= [[\. \. \.] [\. \. \.] [\. \. \.]] (:grid (create-board 3))))
   (testing "default arguments"
-    (is (= (:max-length c/default-options) (count (@(create-board) :grid))))))
+    (is (= (:max-length c/default-options) (count (:grid (create-board)))))))
 
 (deftest test-random-start
   (let [random-start #'c/random-start
         board (create-board)
-        size (count (@board :grid))
+        size (count (:grid board))
         [direction [x y]] (random-start board)]
     (is (= 2 (count (random-start board))))
     (is (> 2 direction))
@@ -37,32 +39,45 @@
     (is (< x size))
     (is (< y size))))
 
-(deftest test-seq-to-re-str
-  (let [seq-to-re-str #'c/seq-to-re-str]
-    (is (= ".{7}" (seq-to-re-str (map (fn [_] c/empty-char) (range 7)))))
-    (is (= ".{2}a{1}.{1}e{1}.{2}" (seq-to-re-str [c/empty-char c/empty-char \a c/empty-char \e c/empty-char c/empty-char])))))
+(defn- fill-board-with
+  ([words] (fill-board-with (create-board) words))
+  ([board words]
+   (let [add-word #'c/add-word]
+     (reduce #(add-word %1 (last %2) (first %2)) board words))))
 
 (deftest test-add-word
   (let [add-word #'c/add-word
         board (create-board)]
     (testing "add word horizontally"
-      (add-word board [0 [3 1]] "arcs")
       (is (= [[\. \. \. \. \. \. \.]
               [\. \. \. \a \r \c \s]
               [\. \. \. \. \. \. \.]
               [\. \. \. \. \. \. \.]
               [\. \. \. \. \. \. \.]
               [\. \. \. \. \. \. \.]
-              [\. \. \. \. \. \. \.]] (@board :grid))))
+              [\. \. \. \. \. \. \.]]
+             (:grid (add-word board [0 [3 1]] "arcs")))))
     (testing "add word vertically"
-      (add-word board [1 [3 1]] "arcs")
       (is (= [[\. \. \. \. \. \. \.]
-              [\. \. \. \a \r \c \s]
+              [\. \. \. \a \. \. \.]
               [\. \. \. \r \. \. \.]
               [\. \. \. \c \. \. \.]
               [\. \. \. \s \. \. \.]
               [\. \. \. \. \. \. \.]
-              [\. \. \. \. \. \. \.]] (@board :grid))))))
+              [\. \. \. \. \. \. \.]]
+             (:grid (add-word board [1 [3 1]] "arcs")))))
+    (testing "does nothing when word pattern already present"
+      (is (= [[\. \. \. \. \. \. \.]
+              [\. \. \. \a \. \. \.]
+              [\. \. \. \r \. \. \.]
+              [\. \. \. \c \. \. \.]
+              [\. \. \. \s \. \. \.]
+              [\. \. \. \. \. \. \.]
+              [\. \. \. \. \. \. \.]]
+             (:grid (fill-board-with [["arcs" [1 [3 1]]]
+                                      ["arcs" [1 [3 1]]]])))))
+    (testing "add new word to board words list"
+      (is (= [(->Word 1 [3 1] "arcs")] (:words (add-word board [1 [3 1]] "arcs")))))))
 
 
 (def word-list
@@ -75,64 +90,38 @@
    ["the"    [0 [1 6]]]])
 
 
-(defn- fill-board-with [words]
-  (let [board (create-board)
-        add-word #'c/add-word]
-    (doseq [[w pos] words]
-      (add-word board pos w))
-    board))
-
-(def full-board (fill-board-with word-list))
-
-(deftest test-filled?
-  (let [filled? #'c/filled?
-        board (create-board)]
-    (testing "when board empty"
-      (is (not (filled? board))))
-    (testing "when board have 7 or more words"
-      (is (filled? full-board)))))
-
-(deftest test-col
-  (is (= [\r \i \s \e \. \. \t] ((var c/col) full-board 1))))
-
-(deftest test-row
-  (is (= [\. \e \x \i \t \. \i] ((var c/row) full-board 3))))
-
-(deftest test-find-coord
-  (let [find-coord #'c/find-coord
-        w (->Word 1 [1 0] "rise")
-        [dir [x y]] (find-coord \i w)]
-    (is (= dir 0))
-    (is (= x 1))
-    (is (= y 1))))
+(deftest test-helpers
+  (let [full-board (fill-board-with word-list)]
+    (testing "col"
+      (is (= [\r \i \s \e \. \. \t] ((var c/col) full-board 1))))
+    (testing "row"
+      (is (= [\. \e \x \i \t \. \i] ((var c/row) full-board 3))))))
 
 
-(deftest test-word-fit-at-intersection-at
-  (let [fun #'c/word-fit-at-intersection-at
-        board (fill-board-with (drop-last 5 word-list))
-        word "exited"
-        pred-at-idx (fun 0 1 3 board word)]
-    (is (pred-at-idx 0))
-    (is (not (pred-at-idx 4)))))
+;; (deftest test-build-slots
+;;   (let [build-slots #'c/build-slots
+;;         vertical-word (c/->Word 1 [3 1] "nine")
+;;         horizontal-word (c/->Word 0 [3 1] "nine")
+;;         word "netten"]
+;;     (ip (= [[0 [3 1]]
+;;             [0 [-2 1]]
+;;             [0 [3 3]]
+;;             [0 [-2 3]]]
+;;            (build-slots \n vertical-word word)))
+;;     (is (= [0 [2 4]]
+;;            [0 [-1 4]]
+;;            (build-slots \e vertical-word word)))
+;;     (is (= [1 [6 0]]
+;;            [1 [6 -3]]
+;;            (build-slots \e horizontal-word word)))))
 
-(deftest test-can-place
-  (let [can-place #'c/can-place
-        board (fill-board-with (drop-last 5 word-list))
-        word "exited"
-        position [0 [1 3]]]
-    (is (= 1 (count (can-place position board word))))
-    (is (= [0 [1 3]] (first (can-place position board word))))))
-;; (deftest test-find-space
-;;   (let [empty-board (create-board)
-;;         board (atom
-;;                [[c/empty-char c/empty-char \a c/empty-char \e c/empty-char c/empty-char]
-;;                 [c/empty-char c/empty-char \r c/empty-char \x c/empty-char c/empty-char]
-;;                 [\r           \e           \s \e           \c \t           \s          ]
-;;                 [c/empty-char c/empty-char \o c/empty-char \i c/empty-char c/empty-char]
-;;                 [c/empty-char c/empty-char \n c/empty-char \t c/empty-char c/empty-char]])
-;;         find-space #'c/find-space]
-;;     (testing "horizontal search"
-;;       (is (= {:dir 0 :coord [0 0] :pattern ".{7}"} (find-space empty-board [0 [0 0]] 3)))
-;;       (is (= {:dir 0 :coord [0 0] :pattern ".{2}a{1}.{1}e{1}.{2}"} (find-space board [0 [0 0]] 3))))
-;;     (testing "vertical search"
-;;       (is (= {:dir 1 :coord [0 0] :pattern ".{2}r{1}.{2}"} (find-space board [1 [0 0]] 3))))))
+;; (deftest test-find-slot
+;;   (let [find-slot #'c/find-slot
+;;         vertical-word (->Word 1 [3 1] "nine")
+;;         horizontal-word (->Word 0 [3 1] "nine")
+;;         word "netten"]
+;;     (is (= [[0 [3 1]]
+;;             [0 [-2 1]]
+;;             [0 [3 3]]
+;;             [0 [-2 3]]]
+;;            ((find-slot word) {:bword vertical-word :inter #{\n \e}})))))
