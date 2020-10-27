@@ -149,4 +149,6 @@
 
 (defn generate [n user-options]
   (binding [*options* (merge default-options user-options)]
-    (fill-board (create-board) (take n (words "words.txt")))))
+    (let [board (create-board)]
+      (fill-board board (take n (words "words.txt")))
+      board)))
