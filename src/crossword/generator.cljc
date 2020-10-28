@@ -1,10 +1,5 @@
-(ns crossword.core
-  #?(:clj
-     (:require [clojure.set :as s]
-               [crossword.clj.source :as source]))
-  #?(:cljs
-      (:require [clojure.set :as s]
-                [crossword.cljs.source :as source])))
+(ns crossword.generator
+  (:require [clojure.set :as s]))
 
 (defonce default-options
   {:max-length 7
@@ -25,17 +20,12 @@
     :grid (mapv #(into [] %) (partition n (repeat (* n n) empty-char)))}))
 
 (declare fill-board add-noise random-start)
-(defn ^:export generate
-  ([]  (generate 100))
-  ([n] (generate n {}))
-  ([n user-options]
-   (let [options (merge default-options user-options)
-         board (create-board (:max-length options))]
-     (-> board
-         (fill-board
-                 (take n (source/words "words.txt" options))
-                 (:start options (random-start board)))
-         add-noise))))
+(defn generate
+  [words options]
+  (let [board (create-board (:max-length options))]
+    (-> board
+        (fill-board words (:start options (random-start board)))
+        add-noise)))
 
 (defn- present? [board word]
   (some #(= word %) (map :pattern (:words board))))
@@ -142,7 +132,7 @@
 
 (defn- add-noise [board]
   "Returns a board with empty-char replaced by random alphabet char"
-  (let [chars (map char (range (int \a) (+ (int \a) 26)))]
+  (let [chars "abcdefghijklmnopqrstuvwxyz"]
     {:words (:words board)
      :grid (map
             (fn [row] (map #(if (= % empty-char) (rand-nth chars) %) row))

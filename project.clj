@@ -8,13 +8,13 @@
                  [org.clojure/clojurescript "1.10.741"]]
   :repl-options {:init-ns crossword.core}
   :profiles {:dev {:resource-paths ["test/resources"]}}
-  :cljsbuild 
-  {:test-command {"node" ["node" :node-runner "target/main.js"]}
+  :cljsbuild
+  {:test-command
+   {"node" ["node" :node-runner "target/main.js"]}
    :builds
    [{:id :main
      :source-paths ["src" "test"]
      :compiler
      {:output-to "target/main.js"
       :optimizations :advanced
-;      :optimizations :whitespace
       :pretty-print false}}]})
