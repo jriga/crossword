@@ -34,8 +34,7 @@
   (GET "/" [] (io/resource "public/index.html"))
   (GET "/request" [] request-words)
   (route/resources "/")
-  (ANY "*" []
-       (route/not-found "Bad request")))
+  (ANY "*" [] (io/resource "public/index.html")))
 
 (defn -main [& [port]]
   (let [port (Integer. (or port (env :port) 5000))]
